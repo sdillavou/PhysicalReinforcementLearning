@@ -104,36 +104,3 @@ Given:
 | Batched updates every $B$ steps                     | action list `['BATCH', -BTH]` → `apply_batch()` (clip by `DGC`, clip params to `[GMN,GMX]`) |
 | Periodic random state reset                         | action list `['RESET', -RES]` → re-roll `self.TDS`                     |
 
-## Differences vs. the manuscript description
-
-- The manuscript example uses **4 states / 4 actions** with one-hot-like
-  voltage encodings $[1\,0\,1\,0]$, $[0\,1\,0\,1]$, $[1\,1\,0\,0]$, $[0\,0\,1\,1]$ V
-  and the trivial environment `next_state = action`. This notebook generalises
-  to a **3×3 grid (9 states) with 5 actions** (`↑ ↓ ← → o`); the state is
-  encoded as two analog input voltages giving (row, column) and an additional
-  fixed input node, and the environment moves on the grid (with walls).
-- The reward landscape adds a small **shaping** term that decays with Manhattan
-  distance from `actual_target` (`shaping = 1e-5`); reward noise scale
-  `_NOISE_SCALE` is set to 0 in this run.
-- The "subtract the mean" term in $L_t$ is implemented exactly as written in
-  the manuscript: `GAM*(max(F(S_{t+1})) - mean(F(S_{t+1})))`.
-- Updates are accumulated over `BTH = 50` steps before being applied (matches
-  "Updates are batched and imposed every 50 steps").
-- An additional periodic random **state reset every `RES = 5` steps** is used
-  to keep exploration broad (not stated in the manuscript snippet but present
-  in the code).
-
-## Differences vs. Algorithm 1 (MPO with Mirrored Data)
-
-This procedure shares the high-level "sample → score → improve parametric
-policy" loop, but the score and the policy update are very different:
-
-| Algorithm 1 (MPO)                                                                 | CLLN Q-learning (this notebook)                                       |
-|-----------------------------------------------------------------------------------|-----------------------------------------------------------------------|
-| Sample $N$ actions $a_i \sim \pi_k(\cdot|s_j)$ per state                          | One action $A_t$ via ε-greedy on free outputs of the network          |
-| Score with critic $Q_{ij} = \hat Q(s_j, a_i)$ and weight $q_{ij}\propto e^{Q_{ij}/\tau}$ | Score with one-step Bellman target $L_t = R_t + \gamma[\max \mathcal{F}(S_{t+1}) - \mathrm{mean}\,\mathcal{F}(S_{t+1})]$ |
-| Mirror states and actions to build augmented dataset                              | No data mirroring                                                      |
-| Update $\pi_\theta$ by weighted maximum-likelihood + KL regulariser               | Update gate voltages by contrastive local rule (Coupled Learning)     |
-| Replay buffer over many transitions                                               | Online; batched accumulation over $B=50$ consecutive transitions      |
-```
-
